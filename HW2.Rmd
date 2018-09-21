@@ -115,7 +115,7 @@ termplot(ModernC_lm, terms = "Pop",
 ```{r fig.height=10, fig.width=10}
 UN3_nona <- UN3 %>% na.omit()
 
-summary(powerTransform(cbind(PPgdp, Pop, Fertility, Purban, Change, Frate)~., data = UN3_nona, family = "bcnPower"))
+summary(powerTransform(as.matrix(cbind(ModernC, PPgdp, Pop, Fertility, Purban, Change, Frate))~., data = UN3_nona, family = "bcnPower"))
 
 UN3_xtransform <- UN3 %>%
     mutate(Pop_trans = log(Pop), PPgdp_trans = log(PPgdp))
