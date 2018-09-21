@@ -1,8 +1,9 @@
 ---
 title: "HW2 STA521 Fall18"
-author: '[Your Name Here, netid and github username here]'
+author: 'Bin Han, bh193, BeanHam'
 date: "Due September 23, 2018 5pm"
 output:
+  word_document: default
   pdf_document: default
   html_document:
     df_print: paged
@@ -14,7 +15,7 @@ Readings: Chapters 3-4 in Weisberg Applied Linear Regression
 
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 ```
 
 This exercise involves the UN data set from `alr3` package. Install `alr3` and the `car` packages and load the data to answer the following questions adding your code in the code chunks.  Please add appropriate code to the chunks to suppress messages and warnings as needed once you are sure the code is working properly and remove instructions if no longer needed. Figures should have informative captions. Please switch the output to pdf for your final version to upload to Sakai. **Remove these instructions for final submission**
@@ -27,98 +28,264 @@ This exercise involves the UN data set from `alr3` package. Install `alr3` and t
 ```{r data}
 library(alr3)
 data(UN3, package="alr3")
-help(UN3) 
-library(car)
+library(dplyr)
+library(ggplot2)
+library(GGally)
+library(knitr)
 ```
 
 
 1. Create a summary of the data.  How many variables have missing data?  Which are quantitative and which are qualtitative?
 
-```{r}
-
+```{r sumamry}
+dim(UN3)
+summary(UN3)
 ```
+(a)	There are total of 7 variables, 6 of which have missing values. They are “ModernC”, “Change”, “PPgdp”, “Frate”, “Pop”, and “Fertility”.
+
+(b)	Based on the values and explanation from the data documentation, all the variables are quantitative.
+
 
 2. What is the mean and standard deviation of each quantitative predictor?  Provide in a nicely formatted table.
 
-```{r}
-
+```{r mean&sd}
+mean <- sapply(UN3, function(x) mean(x, na.rm=TRUE))
+sd <- sapply(UN3, function(x) sd(x, na.rm=TRUE))
+kable(data.frame(mean, sd), digits = 3)
 ```
 
 
 3. Investigate the predictors graphically, using scatterplots or other tools of your choice. Create some plots
-highlighting the relationships among the predictors. Comment
-on your findings regarding trying to predict `ModernC` from the other variables.  Are there potential outliers, nonlinear relationships or transformations that appear to be needed based on your graphical EDA?
+highlighting the relationships among the predictors. Comment on your findings regarding trying to predict `ModernC` from the other variables. Are there potential outliers, nonlinear relationships or transformations that appear to be needed based on your graphical EDA?
 
-```{r}
-
+```{r scatterplots, fig.height=10, fig.width=10}
+ggpairs(UN3, columns =1:ncol(UN3))
 ```
+
+(a)	Given that “ModernC” is the response variable, we can see that the correlation between “ModernC” and “Change”, “Fertility”, and “Purban” are fairly strong and linear. However, for explanatory variable “PPgdp”, even though the correlation is strong, the relationship does not appear to be quite linear. There seems to be a quadratic pattern displayed. Some transformation is needed for “PPgdp” to make the relationship more linear.
+
+(b)	The variable “Pop” has an extremely right-skewed distribution. It is mainly because it has two observations with extremely high values. Those two values could be potential outliers, which need to be testified in later process.
+
+
 
 ## Model Fitting
-
 4.  Use the `lm()` function to perform a multiple linear regression with `ModernC` as the response and all other variables as the predictors, using the formula `ModernC ~ .`, where the `.` includes all remaining variables in the dataframe.  Create  diagnostic residual plot from the linear model object and comment on results regarding assumptions.  How many observations are used in your model fitting?
 
-```{r}
+```{r linear model, fig.height=10, fig.width = 10}
+ModernC_lm <- lm(ModernC~., data=UN3)
+
+summary(ModernC_lm)
+
+
+par(mfrow = c(2,2))
+plot(ModernC_lm)
 
 ```
+
+(a)	Based on the summary of linear regression model, the degree of freedom is 118. Calculating backward, n - p -1 = 118, so that we have n = 125. Therefore, 125 observations have been used to fit the model. We can also prove that from the explanation that “85 observations deleted due to missingness”, 210 - 85 = 125.
+
+(b)	From the diagnostic plots, we can see that the variances of residuals over the fitted values are fairly constant, with some variations displayed. It can be also seen from the Scale-Location graph.
+
+(c)	From the normal qqplot, we can see that several points scatter below the normal line on the right side, with most of the observations on the line. Therefore, we may conclude that the distribution is roughly normal.
+
+(d)	From the leverage plot and Cook’s Distance value, we can see that there are no influential points. However, there are values that have high leverages, such as China and India.
+
+
 
 5. Examine added variable plots `car::avPlot` or `car::avPlots`  for your model above. Are there any plots that suggest that transformations are needed for any of the terms in the model? Describe. Is it likely that any of the localities are influential for any of the terms?  Which localities?  Which terms?  
 
-```{r}
+```{r avPlots, fig.width=10, fig.height=10}
+car::avPlots(ModernC_lm)
 
+termplot(ModernC_lm, terms = "Pop",
+         partial.resid = T, se=T, rug=T, 
+         smooth = panel.smooth)
 ```
+
+(1)	The scatter plot between “Pop” and “ModernC” shows that “Pop” needs to be transformed since there are two observations, China and India, that are way far away from other observations. Therefore, we could potentially apply some transformation on the variable “Pop” to make it less skewed and more linear.
+
+(2)	As discussed in question 3, the relationship between “ModernC” and “PPgdp” does not seem to be quite linear, with a quadratic pattern shown. Based on the scatter plot above, we can also see that some observations scattered far to the right and down below. Some transformation is also needed on “PPgdp”.
+
+(3)	There is no actual influential point existing in the dataset, as tested in question (4) with the Cook’s Distance Criteria. 
+
 
 6.  Using the Box-Tidwell  `car::boxTidwell` or graphical methods find appropriate transformations of the predictor variables to be used as predictors in the linear model.  If any predictors are negative, you may need to transform so that they are non-negative.  Describe your method and  the resulting transformations.
 
 
-```{r}
+```{r fig.height=10, fig.width=10}
+UN3_nona <- UN3 %>% na.omit()
+
+summary(powerTransform(cbind(PPgdp, Pop, Fertility, Purban, Change, Frate)~., data = UN3_nona, family = "bcnPower"))
+
+UN3_xtransform <- UN3 %>%
+    mutate(Pop_trans = log(Pop), PPgdp_trans = log(PPgdp))
 
 ```
+Based on the powerTransform result, we can see that the ideal transformation for the two variables are:  
+PPgdp_trans = PPgdp^ (-0.144)
+Pop_trans =log (Pop)
+
+However, considering of interpretability of the variables, I decided to use the following transformations which are very close to the ideal transformations: 
+PPgdp_trans = log (PPgdp)
+Pop_trans = log (Pop)
+
+Another independent variable “fertility” also has a suggested transformation from the result. However, judging the linearity from the scatter plot between “fertility” and “ModernC”, I decided not to transform it.
+
+
 
 7. Given the selected transformations of the predictors, select a transformation of the response using `MASS::boxcox` or `car::boxCox` and justify.
 
-
-```{r}
-
+```{r fig.height=8, fig.width=8}
+ModernC_xtrans <- lm(ModernC ~ Pop_trans + Change + PPgdp_trans + Frate + Fertility + Purban, data=UN3_xtransform)
+MASS::boxcox(ModernC_xtrans)
 ```
+
+Given the transformation on “Pop” and “PPgdp”, the ideal transformation of response variable covers the range of (0.5, 1). Similarly, taken the easiness of interpretating the result into consideration, I decided to use lambda = 1, which does not transform the response variable. 
+
 
 8.  Fit the regression using the transformed variables.  Provide residual plots and added variables plots and comment.  If you feel that you need additional transformations of either the response or predictors, repeat any steps until you feel satisfied.
 
+```{r fig.width=10, fig.height=10}
+summary(ModernC_xtrans)
+
+par(mfrow = c(2,2))
+plot(ModernC_xtrans)
+
+car::avPlots(ModernC_xtrans)
+```
+(1)	From the residual plot and scale-location plot, we can see that the variance of residual is fairly constant, with some up and down variation. From the normal quantile plot, we can determine that it is roughly normal. Based on the leverage plot, we can conclude that there are still no influential points.
+
+(2)	From the added variable plots, we can see that the transformed PPgdp and Pop both look much more linear with ModernC. 
+
+
+
 9. Start by finding the best transformation of the response and then find transformations of the predictors.  Do you end up with a different model than in 8?
 
+```{r fig.width=10, fig.height=10}
+boxCox(ModernC_lm)
 
-```{r}
+UN3_nona <- UN3 %>% na.omit()
+
+summary(powerTransform(cbind(PPgdp, Pop, Fertility, Purban, Change, Frate)~., data = UN3_nona, family = "bcnPower"))
+
+UN3_xtransform <- UN3 %>%
+    mutate(Pop_trans = log(Pop), PPgdp_trans = log(PPgdp))
 
 ```
+No. The result would be the same. 
+
+It is because when I started with transforming the response variable, the ideal range of exponent is still (0.5, 1). For the sake of interpretability, I will still choose to use the original response variable, which corresponds to lamda = 1. Afterthen, the process of finding out the transformation for explanatory variables is exactly the same as shown in the previous questions. Therefore, the two models will be the same.
+
 
 10.  Are there any outliers or influential points in the data?  Explain.  If so, refit the model after removing any outliers and comment on residual plots.
 
+```{r fig.height=10, fig.width=10}
+## Cook's Distance
+rownames(UN3)[cooks.distance(ModernC_lm)>1]
 
-```{r}
+## Bonferonni Correction
+abs.ti <- abs(rstudent(ModernC_xtrans))
+pval <- 2*(1-pt(max(abs.ti), ModernC_xtrans$df-1))
 
+criteria <- 0.05/210
+mean(pval < criteria)
+
+## Remove observations with higher leverage values.
+ModernC_remove <- lm(ModernC~., data=UN3, subset = rownames(UN3)!= c("China","India"))
+
+par(mfrow = c(2,2))
+plot(ModernC_remove)
+
+avPlots(ModernC_remove)
 ```
+From previous Leverage Plot and the Cook's Distance method, there is no influential points.
+
+Using Bonferronni Correction, which compares p-value with alpha/n, there is no outliers either.
+
+If instead, we remove the two observations with higher leverage values, China and India, we find out that all the plots in the diagnostic plots are approximately the same. The variance of residuals is still roughly constant. The normal qqplot indicates that the distribution of response variable is fairly normal. The only difference is that even though we remove China and India, there are still other observations that will come up with higher leverage values. Therefore, we do not need to remove the two observations. Transform explanatory variables would be enough.
 
 ## Summary of Results
 
 11. For your final model, provide summaries of coefficients with 95% confidence intervals in a nice table with interpretations of each coefficient.  These should be in terms of the original units! 
 
-
 ```{r}
+table <- data.frame(ModernC_xtrans$coefficients, confint(ModernC_xtrans))
+table <- table %>%  
+    rename(Coefficients = ModernC_xtrans.coefficients, Lower_Bound = X2.5.., Upper_Bound = X97.5..)
+table
 
 ```
+Interpretation:
+(a) Change: For each one percentage point increase in the annual population growth rate, the percent of unmarried women will increase by 4.993 percentage points.
+
+(b) Frate: For each one percentage point increase in the percent of female over age 15 economically active, the percent of unmarried women will increase by 0.189 percentage point. 
+
+(c) Fertility: For each one unit increase in the expected number of live births per female, the percent of unmarried women will decrease by 9.67 percentage points.
+
+(d) Purban: For each one percentage point increase in percent of population that is urban, the percent of unmarried women will decrease by 0.071 percentage point.
+
+(e) Pop_trans: For each 10% increase in Population, the percent of unmarried women will increase by 1.47207 * log(1.1) = 0.14 percentage point.
+
+(f) PPgdp_trans: For each 10% increase in per Capita 2001 GDP, the percent of unmarried women will increase 5.507278 * log(1.1) = 0.5248 percentage point.
 
 
-12. Provide a paragraph summarizing your final model  and findings suitable for the US envoy to the UN after adjusting for outliers or influential points.   You should provide a justification for any case deletions in your final model
+12. Provide a paragraph summarizing your final model and findings suitable for the US envoy to the UN after adjusting for outliers or influential points. You should provide a justification for any case deletions in your final model
 
+With all the diagnostic analysis and model selection, I ended up with the model:
 
-```{r}
+ModernC = 4.115 + 4.993*Change + 0.189*Frate - 9.676*Fertility - 0.071*Purban + 1.472*log(Pop) + 5.507*log(PPgdp)
 
-```
+Generally, we can see that the percentage of unmarried women is negatively correlated with expected number of live birth per female and the percent of population that is urban, while positively correlated with other variables. Based on US's population composition and developmental plan, the government could take actions on policy-making to influence the population structure of unmarried women. 
 
 
 ## Methodology
 
     
-13. Prove that the intercept in the added variable scatter plot will always be zero.  _Hint:  use the fact that if $H$ is the project matrix which contains a column of ones, then $1_n^T (I - H) = 0$.  Use this to show that the sample mean of residuals will always be zero if there is an intercept._
+13. Prove that the intercept in the added variable scatter plot will always be zero.  _Hint:  use the fact that if $H$ is the project matrix which contains a column of ones, then $1_n^T (I - H) = 0$.  Use this to show that the sample mean of residuals will always be zero if there is an intercept.
 
+$$
+For the added variable plot, we are regressing the residuals from the overall model excluding one explanatory variable (ex. x1) on the residuals from regressing x1 on all other independent variables.
+
+\[e_y = \hat\beta_0 + \hat\beta_1 e_{x_3}\] \par
+\[(I-H)Y = \hat\beta_0 + \hat\beta_1 (I-H)X_3\] \par
+Given that: \(\hat\beta_1 = (X^TX)^{-1}X^TY\) \par
+We substitute \(X^ = (I-H)X_3\), ~\(Y = (I-H)Y\) \par
+We have: \par
+\[
+\begin{split}
+(I-H)Y &= \hat\beta_0 + [X_3^T(I-H)(I-H)X_3]^{-1}[(I-H)X_3]^T(I-H)Y(I-H)X_3 \\
+&= \hat\beta_0 + [X_3^T(I-H)X_3]^{-1}X_3^T(I-H)Y(I-H)X_3
+\end{split}
+\] \par
+Multiply both sides with \(X_3^T\), we have:
+\[X_3^T(I-H)Y = X_3^T \hat\beta_0 + X_3^T[X_3^T(I-H)X_3]^{-1}X_3^T(I-H)Y(I-H)X_3\] \par
+Since \([X_3^T(I-H)X_3]^{-1}\)~and~\(X_3^T(I-H)Y\) are both scalar, we have:
+\[
+\begin{split}
+X_3^T(I-H)Y&= X_3^T \hat\beta_0 + [X_3^T(I-H)X_3][X_3^T(I-H)X_3]^{-1}X_3^T(I-H)Y \\
+&= X_3^T \hat\beta_0 + X_3^T(I-H)Y
+\end{split}
+\]
+
+So we have:
+\[X_3^T\hat\beta_0 = 0\]
+Therefore:
+\[\hat\beta_0 = 0\]
+$$
 
 14. For multiple regression with more than 2 predictors, say a full model given by `Y ~ X1 + X2 + ... Xp`   we create the added variable plot for variable `j` by regressing `Y` on all of the `X`'s except `Xj` to form `e_Y` and then regressing `Xj` on all of the other X's to form `e_X`.  Confirm that the slope in a manually constructed added variable plot for one of the predictors  in Ex. 10 is the same as the estimate from your model. 
+
+```{r}
+UN3_xtransform_NoNA <- UN3_xtransform %>% na.omit()
+e_Y <- residuals(lm(ModernC ~ Pop_trans + PPgdp_trans + Change + Fertility + Purban, data=UN3_xtransform_NoNA))
+e_X <- residuals(lm(Frate ~ Pop_trans + PPgdp_trans + Change + Fertility + Purban, data=UN3_xtransform_NoNA))
+
+residual_regreesion<- data.frame(e_Y, e_X)
+
+addedvairable <- lm(e_Y ~ e_X, data=residual_regreesion)
+summary(addedvairable)$coef
+
+summary(ModernC_xtrans)$coef
+```
+
+We can see that for variable "Frate", in the added regression, the estimated coefficien is 0.18939, which is exactly the same as the estimated coefficient of "Frate" in the overall regression.
