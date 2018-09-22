@@ -4,22 +4,15 @@ author: 'Bin Han, bh193, BeanHam'
 date: "Due September 23, 2018 5pm"
 output:
   word_document: default
-  pdf_document: default
   html_document:
     df_print: paged
+  pdf_document: default
 ---
-
-## Backgound Reading
-
-Readings: Chapters 3-4 in Weisberg Applied Linear Regression
 
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 ```
-
-This exercise involves the UN data set from `alr3` package. Install `alr3` and the `car` packages and load the data to answer the following questions adding your code in the code chunks.  Please add appropriate code to the chunks to suppress messages and warnings as needed once you are sure the code is working properly and remove instructions if no longer needed. Figures should have informative captions. Please switch the output to pdf for your final version to upload to Sakai. **Remove these instructions for final submission**
-
 
 ## Exploratory Data Analysis
 
@@ -166,7 +159,7 @@ boxCox(ModernC_lm)
 
 UN3_nona <- UN3 %>% na.omit()
 
-summary(powerTransform(cbind(PPgdp, Pop, Fertility, Purban, Change, Frate)~., data = UN3_nona, family = "bcnPower"))
+summary(powerTransform(as.matrix(cbind(ModernC, PPgdp, Pop, Fertility, Purban, Change, Frate))~., data = UN3_nona, family = "bcnPower"))
 
 UN3_xtransform <- UN3 %>%
     mutate(Pop_trans = log(Pop), PPgdp_trans = log(PPgdp))
@@ -190,19 +183,11 @@ pval <- 2*(1-pt(max(abs.ti), ModernC_xtrans$df-1))
 criteria <- 0.05/210
 mean(pval < criteria)
 
-## Remove observations with higher leverage values.
-ModernC_remove <- lm(ModernC~., data=UN3, subset = rownames(UN3)!= c("China","India"))
-
-par(mfrow = c(2,2))
-plot(ModernC_remove)
-
-avPlots(ModernC_remove)
 ```
-From previous Leverage Plot and the Cook's Distance method, there is no influential points.
+From previous Leverage Plot and the Cook's Distance method, which compares Cook's distance value with 1, there is no influential point.
 
-Using Bonferronni Correction, which compares p-value with alpha/n, there is no outliers either.
+Using Bonferronni Correction, which compares p-value with alpha/n, we find out that all the p-vaues are greater than the shreshold. Therefore, we do not have enough evidence to reject the null hypothesis, meaning that there is no outlier.
 
-If instead, we remove the two observations with higher leverage values, China and India, we find out that all the plots in the diagnostic plots are approximately the same. The variance of residuals is still roughly constant. The normal qqplot indicates that the distribution of response variable is fairly normal. The only difference is that even though we remove China and India, there are still other observations that will come up with higher leverage values. Therefore, we do not need to remove the two observations. Transform explanatory variables would be enough.
 
 ## Summary of Results
 
@@ -235,7 +220,7 @@ With all the diagnostic analysis and model selection, I ended up with the model:
 
 ModernC = 4.115 + 4.993*Change + 0.189*Frate - 9.676*Fertility - 0.071*Purban + 1.472*log(Pop) + 5.507*log(PPgdp)
 
-Generally, we can see that the percentage of unmarried women is negatively correlated with expected number of live birth per female and the percent of population that is urban, while positively correlated with other variables. Based on US's population composition and developmental plan, the government could take actions on policy-making to influence the population structure of unmarried women. 
+Generally, we can see that the percentage of unmarried women is negatively correlated with expected number of live birth per female and the percent of population that is urban, while positively correlated with other variables. Based on US's population composition and developmental plan, the government could take actions on policy-making to influence the population structure of unmarried women. For instance, if the US government wants to increase the percentage of unmarried women, they could potentially shift some population from urban area to sub-urban or rural area. 
 
 
 ## Methodology
